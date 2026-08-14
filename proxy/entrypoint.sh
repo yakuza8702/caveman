@@ -1,26 +1,28 @@
 #!/usr/bin/env sh
 set -e
 
-export CAVEMAN_MODE="${CAVEMAN_MODE:-compress}"
-export CAVEMAN_LISTEN="${CAVEMAN_LISTEN:-127.0.0.1:8788}"
-export CAVEMAN_UPSTREAM_NAME="${CAVEMAN_UPSTREAM_NAME:-openrouter}"
-export CAVEMAN_UPSTREAM_BASE_URL="${CAVEMAN_UPSTREAM_BASE_URL:-https://openrouter.ai/api/v1}"
-export CAVEMAN_API_KEY_ENV="${CAVEMAN_API_KEY_ENV:-OPENROUTER_API_KEY}"
-
+# 1) Render caveman.yaml from env (python expandvars; safe for missing vars)
 python3 - <<'EOF'
 import os
 src = open("/etc/caveman/caveman.yaml.tmpl").read()
-open("/etc/caveman/caveman.yaml","w").write(os.path.expandvars(src))
+out = os.path.expandvars(src)
+open("/etc/caveman/caveman.yaml","w").write(out)
 print("rendered /etc/caveman/caveman.yaml")
 EOF
 
+# 2) Tell caveman-proxy WHERE its config lives.  <-- ADD THIS LINE
+export CAVEMAN_CONFIG="/etc/caveman/caveman.yaml"
+
+# 3) Start caveman-proxy (compressor) on loopback
 /usr/local/bin/caveman-proxy &
 PROXY_PID=$!
 echo "caveman-proxy started pid=$PROXY_PID"
 
+# 4) Start public wrapper on 0.0.0.0:8787 (/models + forwards to proxy)
 python3 /usr/local/bin/wrapper.py &
 WRAP_PID=$!
 echo "wrapper started pid=$WRAP_PID"
 
+# 5) Die together on shutdown
 trap "kill $WRAP_PID $PROXY_PID 2>/dev/null" TERM INT
 wait
