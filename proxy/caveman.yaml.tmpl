@@ -1,6 +1,6 @@
-mode: ${CAVEMAN_MODE:-compress}
-listen: ${CAVEMAN_LISTEN:-127.0.0.1:8788}
+mode: ${CAVEMAN_MODE}
+listen: ${CAVEMAN_LISTEN}
 compat:
-  ${CAVEMAN_UPSTREAM_NAME:-openrouter}:
-    base_url: ${CAVEMAN_UPSTREAM_BASE_URL:-https://openrouter.ai/api/v1}
-    api_key_env: ${CAVEMAN_API_KEY_ENV:-OPENROUTER_API_KEY}
+  ${CAVEMAN_UPSTREAM_NAME}:
+    base_url: ${CAVEMAN_UPSTREAM_BASE_URL}
+    api_key_env: ${CAVEMAN_API_KEY_ENV}
