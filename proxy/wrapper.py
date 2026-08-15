@@ -61,11 +61,27 @@ class H(http.server.BaseHTTPRequestHandler):
                 self._send_error_json(502, str(e))
                 return
 
-            # Rename models with prefix so OpenWebUI shows them distinctly
+            # Rename models with prefix so OpenWebUI shows them distinctly:
+            #  - 'id'   -> prefixed (sent back to us in POST; we strip it then)
+            #  - 'name' -> prefixed too, because mobile OpenWebUI shows the
+            #              display name (not the id), so both connections
+            #              looked identical without this.
             if isinstance(data, dict) and "data" in data:
                 for model in data["data"]:
-                    if isinstance(model, dict) and "id" in model:
+                    if not isinstance(model, dict):
+                        continue
+                    if "id" in model and isinstance(model["id"], str):
                         model["id"] = MODEL_PREFIX + model["id"]
+                    # Display name must be prefixed too (mobile OpenWebUI shows
+                    # 'name', not 'id'). Fall back to the prefixed id when the
+                    # upstream omitted a name.
+                    name = model.get("name")
+                    if not isinstance(name, str) or name == "":
+                        name = model.get("id", "")
+                    if isinstance(name, str) and name != "":
+                        if MODEL_PREFIX and not name.startswith(MODEL_PREFIX):
+                            name = MODEL_PREFIX + name
+                        model["name"] = name
             self._send_json(200, data)
         else:
             self._send_error_json(404, "not found")
