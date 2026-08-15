@@ -4,7 +4,8 @@ Standalone model-renaming proxy for OpenWebUI.
 
 Run this alongside your caveman-proxy container. Point one OpenWebUI connection
 at this proxy (e.g. http://caveman-renamer:8789/v1) and the other at direct
-OpenRouter. This proxy prefixes model names so OpenWebUI shows them distinctly.
+OpenRouter. This proxy prefixes model names so OpenWebUI shows them distinctly,
+and strips the prefix from outbound chat requests so OpenRouter accepts them.
 
 Usage:
   OPENROUTER_API_KEY=sk-or-v1-xxx python3 standalone-renamer.py
@@ -22,6 +23,14 @@ LISTEN = os.environ.get("LISTEN", "0.0.0.0:8789").rsplit(":", 1)
 OR_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OR_BASE = os.environ.get("OPENROUTER_BASE", "https://openrouter.ai/api/v1")
 MODEL_PREFIX = os.environ.get("MODEL_PREFIX", "cave-")
+
+
+def strip_prefix(value):
+    """Remove MODEL_PREFIX from a model id before forwarding to OpenRouter."""
+    if MODEL_PREFIX and isinstance(value, str) and value.startswith(MODEL_PREFIX):
+        return value[len(MODEL_PREFIX):]
+    return value
+
 
 class Proxy(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -77,6 +86,18 @@ class Proxy(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+
+        # Strip the display prefix from the model field before forwarding,
+        # so OpenRouter receives the REAL model id (it rejects 'cave-...').
+        try:
+            payload = json.loads(body)
+            if isinstance(payload, dict):
+                if "model" in payload:
+                    payload["model"] = strip_prefix(payload["model"])
+                body = json.dumps(payload).encode()
+        except (ValueError, TypeError):
+            pass  # not JSON (or not a dict) -> forward unchanged
+
         # Check if client wants streaming
         is_stream = b'"stream":true' in body or b'"stream": True' in body
         path = self.path  # e.g. /v1/chat/completions
