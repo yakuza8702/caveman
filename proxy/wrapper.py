@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Caveman proxy wrapper: GET /v1/models -> OpenRouter (renamed); POST /v1/chat/completions -> caveman-proxy with streaming support."""
-import os, http.server, urllib.request, urllib.error, sys, json, select
+import os, http.server, urllib.request, urllib.error, sys, json
 
 LISTEN = os.environ.get("WRAPPER_LISTEN", "0.0.0.0:8787").rsplit(":", 1)
 MODELS = os.environ.get("UPSTREAM_MODELS", "https://openrouter.ai/api/v1/models")
@@ -9,6 +9,14 @@ CHAT   = os.environ.get("CAVEMAN_UPSTREAM",
 
 # Prefix to distinguish caveman models from direct OpenRouter models in OpenWebUI
 MODEL_PREFIX = os.environ.get("CAVEMAN_MODEL_PREFIX", "cave-")
+
+
+def strip_prefix(value):
+    """Remove MODEL_PREFIX from a model id (e.g. 'cave-~deepseek/x' -> '~deepseek/x')."""
+    if MODEL_PREFIX and isinstance(value, str) and value.startswith(MODEL_PREFIX):
+        return value[len(MODEL_PREFIX):]
+    return value
+
 
 class H(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -65,7 +73,17 @@ class H(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
 
-        # Forward to caveman-proxy
+        # Strip the display prefix from the model field before forwarding,
+        # so OpenRouter receives the REAL model id (it rejects 'cave-...').
+        try:
+            payload = json.loads(body)
+            if isinstance(payload, dict):
+                if "model" in payload:
+                    payload["model"] = strip_prefix(payload["model"])
+                body = json.dumps(payload).encode()
+        except (ValueError, TypeError):
+            pass  # not JSON (or not a dict) -> forward unchanged
+
         req = urllib.request.Request(CHAT, data=body, method="POST")
         for h in ("Content-Type", "Authorization", "Accept"):
             if h in self.headers:
