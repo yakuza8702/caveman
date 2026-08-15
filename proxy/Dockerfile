@@ -24,6 +24,7 @@ ENV CAVEMAN_API_KEY_ENV=OPENROUTER_API_KEY
 ENV CAVEMAN_UPSTREAM=http://127.0.0.1:8788/compat/openrouter/v1/chat/completions
 ENV WRAPPER_LISTEN=0.0.0.0:8787
 ENV UPSTREAM_MODELS=https://openrouter.ai/api/v1/models
+ENV CAVEMAN_MODEL_PREFIX=cave-
 
 EXPOSE 8787
 ENTRYPOINT ["/entrypoint.sh"]
