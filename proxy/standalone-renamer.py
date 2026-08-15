@@ -77,11 +77,25 @@ class Proxy(http.server.BaseHTTPRequestHandler):
             return self._send_error(e.code, e.read().decode())
         except Exception as e:
             return self._send_error(502, str(e))
-        # Prefix all model IDs
+        # Prefix all model IDs and display names (mobile OpenWebUI shows the
+        # display 'name', so prefixing only the id left both connections looking
+        # identical there).
         if "data" in data:
             for m in data["data"]:
-                if "id" in m:
+                if not isinstance(m, dict):
+                    continue
+                if "id" in m and isinstance(m["id"], str):
                     m["id"] = MODEL_PREFIX + m["id"]
+                # Display name must be prefixed too (mobile OpenWebUI shows
+                # 'name', not 'id'). Fall back to the prefixed id when the
+                # upstream omitted a name.
+                name = m.get("name")
+                if not isinstance(name, str) or name == "":
+                    name = m.get("id", "")
+                if isinstance(name, str) and name != "":
+                    if MODEL_PREFIX and not name.startswith(MODEL_PREFIX):
+                        name = MODEL_PREFIX + name
+                    m["name"] = name
         self._send_json(200, data)
 
     def do_POST(self):
